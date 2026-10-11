@@ -84,13 +84,21 @@ class FactScorer(object):
 
 
     def print_cost_estimates(self, total_words, task, model):
+        # https://help.openai.com/en/articles/4936856-what-are-tokens-and-how-to-count-them
+        # Number of tokens are roughly 4/3 of the number of words
         total_tokens = total_words * 4.0 / 3
+
+        # https://openai.com/pricing
+        # if we use davinci-003, the cost is $0.02 per 1000 tokens
+        # if we use gpt-3.5-turbo, the cost is $0.002 per 1000 tokens
         if model == "davinci-003":
             rate = 0.02
         elif model == "gpt-3.5-turbo":
             rate = 0.002
 
         total_cost = total_tokens * rate / 1000
+
+        # print the total words, tokens, and cost along with rate
         logging.critical("Estimated OpenAI API cost for %s ($%.3f per 1000 tokens): $%.2f for %d words and %d tokens" % (task, rate, total_cost, total_words, total_tokens))
 
     def get_score(self,
@@ -101,6 +109,7 @@ class FactScorer(object):
                   knowledge_source=None,
                   verbose=False):
         if knowledge_source is None:
+            # use the default knowledge source
             knowledge_source = "enwiki-20230401"
 
         if knowledge_source not in self.retrieval:
@@ -121,6 +130,7 @@ class FactScorer(object):
                                                         demon_dir=os.path.join(self.data_dir, "demos"),
                                                         gpt3_cache_file=os.path.join(self.cache_dir, "InstructGPT.pkl"))
 
+            # estimate the total cost of atomic fact generation
             total_words = 0
             for gen in generations:
                 total_words += self.af_generator.run(gen, cost_estimate=self.cost_estimate)
@@ -132,10 +142,12 @@ class FactScorer(object):
 
             atomic_facts = []
             for topic, gen in zip(topics, generations):
+                # optionally, first detect if the response is abstained
                 response_abstained = is_response_abstained(gen, self.abstain_detection_type)
                 if response_abstained:
                     atomic_facts.append(None)
                     continue
+                # continue only when the response is not abstained
                 curr_afs, _ = self.af_generator.run(gen)
                 curr_afs = [fact for _, facts in curr_afs for fact in facts]
                 if len(curr_afs)==0:
@@ -151,6 +163,7 @@ class FactScorer(object):
         respond_ratio = np.mean([facts is not None for facts in atomic_facts])
 
         if "ChatGPT" in self.model_name:
+            # estimate the total cost of response generation
             total_words = 0
             for topic, generation, facts in zip(topics, generations, atomic_facts):
                 if facts is not None:
@@ -219,12 +232,14 @@ class FactScorer(object):
                 output = self.lm.generate(prompt)
 
                 if type(output[1])==np.ndarray:
+                    # when logits are available
                     logits = np.array(output[1])
                     assert logits.shape[0] in [32000, 32001]
                     true_score = logits[5852]
                     false_score = logits[7700]
                     is_supported = true_score > false_score
                 else:
+                    # when logits are unavailable
                     generated_answer = output[0].lower()
                     if "true" in generated_answer or "false" in generated_answer:
                         if "true" in generated_answer and "false" not in generated_answer:
@@ -345,6 +360,7 @@ if __name__ == '__main__':
     logging.critical("Respond ratio = %.1f%%" % (100*out["respond_ratio"]))
     logging.critical("# Atomic facts per valid response = %.1f" % (out["num_facts_per_response"]))
 
+    # Save out as a json file
     with open(args.input_path.replace(".jsonl", f"_factscore_output.json"), 'w') as f:
         f.write(json.dumps(out) + "\n")
 
