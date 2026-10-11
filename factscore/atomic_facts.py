@@ -196,8 +196,8 @@ def is_date(text):
 
 def extract_numeric_values(text):
     pattern = r'\b\d+\b'  # regular expression pattern for integers
-    numeric_values = re.findall(pattern, text)  # find all numeric values in text
-    return set([value for value in numeric_values])
+    numeric_values = re.findall(pattern, text)  # find all numeric values in the text
+    return set([value for value in numeric_values])  # convert the values to float and return as a list
 
 
 def detect_entities(text, nlp):
