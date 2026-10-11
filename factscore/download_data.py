@@ -147,3 +147,4 @@ if __name__ == '__main__':
     subprocess.run(["mv demos %s" % args.data_dir], shell=True)
     subprocess.run(["mv enwiki-20230401.db %s" % args.data_dir], shell=True)
 
+
